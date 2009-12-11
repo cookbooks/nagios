@@ -1,0 +1,4 @@
+#!/bin/sh
+# set memory limit to 30MB
+exec 2>&1
+exec chpst -u nagios -U nagios -m 31457280 <%= @node[:nagios][:bot_path] %> <%= @node[:nagios][:bot_username]%> <%= @node[:nagios][:bot_password] %> <%= @node[:nagios][:bot_authorized_jids] %>

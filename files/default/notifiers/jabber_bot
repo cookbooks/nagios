@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+#
+
+require 'rubygems'
+require 'xmpp4r-simple'
+require 'drb'
+include Jabber
+
+jabber = Simple.new(ARGV[0], ARGV[1])
+AUTHORIZED_JIDS = ARGV[2].split(",")
+
+DRb.start_service("druby://127.0.0.1:10370", jabber)
+STATES = {0 => 'OK', 1 => "WARN", 2 => "CRIT"}
+
+def parse_nagios_status
+  status = File.read("/var/cache/nagios3/status.dat")
+  objects = status.split("\n\n")
+  all_objects = objects.collect do |o|
+    values_hash = {}
+    results = o.scan /\t(.+?)=(.+)/
+    results.each {|value| values_hash[value[0]] = value[1] }  
+    values_hash if values_hash['host_name']
+  end
+  all_objects.compact.sort_by {|ob| ob['host_name'] }
+end
+
+def show_state(obj)
+  "#{STATES[obj['current_state'].to_i]} #{obj['host_name']} #{obj['plugin_output']}"  
+end
+
+loop do
+  sleep 0.05
+  jabber.received_messages do |msg|
+    next if AUTHORIZED_JIDS.include?(msg.from)
+    case 
+      when msg.body =~ /^fullstats/
+        jabber.deliver(msg.from, `/usr/local/nagios/bin/nagiostats`)
+      when msg.body =~ /^stats/
+        jabber.deliver(msg.from, `/usr/local/nagios/bin/nagiostats | grep -E '(Services Ok|Hosts Up)'`)
+      when msg.body =~ /^broken/
+        objs = parse_nagios_status
+        txt = objs.collect {|o| show_state(o) if o['current_state'].to_i != 0 }.compact.join("\n")
+        txt = "All good!" if txt == ""
+        jabber.deliver(msg.from, txt)
+      when msg.body =~ /^all/
+        objs = parse_nagios_status
+        txt = objs.collect {|o| show_state(o) }.join("\n")
+        jabber.deliver(msg.from, txt)
+    end        
+  end
+end

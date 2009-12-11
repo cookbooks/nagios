@@ -1,0 +1,11 @@
+# host definitions
+
+<% @hosts.each do |host| %>
+define host {
+  use server
+  address <%= host['ipaddress'] %>
+  host_name <%= host['hostname'] %>
+  hostgroups <%= hostgroups_for(host) %>
+}
+
+<% end %>

@@ -1,0 +1,30 @@
+define service {
+  use default-service
+  host_name *
+  service_description ping
+  check_command check_ping!100.0,20%!500.0,60%
+}
+
+define service {
+  use                     default-service
+  hostgroup_name          servers
+  service_description     Free Space All Disks
+  check_command			      check_all_disks
+}
+
+define service {
+	use                     default-service
+	hostgroup_name          servers
+	service_description     Load Average
+	check_command			      check_load
+}
+
+define service{
+  use                     default-service
+  hostgroup_name          servers
+  service_description     Free Memory
+  check_command			      check_mem
+}
+
+
+# application checks

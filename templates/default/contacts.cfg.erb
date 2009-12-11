@@ -1,0 +1,60 @@
+define contact {
+  contact_name                    root
+  alias                           Root
+  service_notification_period     24x7
+  host_notification_period        24x7
+  service_notification_options    w,u,c,r
+  host_notification_options       d,r
+  service_notification_commands   service-notify-by-email
+  host_notification_commands      host-notify-by-email
+  email                           root@localhost
+}
+
+define contactgroup {
+  contactgroup_name       admins
+  alias                   Nagios Administrators
+  members                 root
+}
+
+define contactgroup {
+	contactgroup_name		sysadmin
+	alias					Sysadmins
+}
+
+define contactgroup {
+	contactgroup_name		sysadmin-sms
+	alias					Sysadmin SMS
+}
+
+
+define contact{
+  use			 generic-contact
+  contact_name admin
+  alias 		 Admin
+  email 		 admin@example.com
+  pager		 12345678
+  address1	admin@example.com
+  contactgroups	admins
+}
+
+define contact{
+  contact_name admin-sms
+  use			 sms-contact
+  alias 		 Admin
+  email 		 admin@example.com
+  pager		 12345678
+  address1	admin@example.com
+  contactgroups	sysadmin-sms
+  service_notification_commands service-notify-by-sms-gateway
+  host_notification_commands host-notify-by-sms-gateway
+}
+
+define contact{
+  contact_name campfire
+  use			 generic-contact
+  alias 		 Campfire
+  service_notification_commands   service-notify-by-campfire
+  host_notification_commands      host-notify-by-campfire
+  email 		 monitoring@example.com
+  contactgroups	admins
+}

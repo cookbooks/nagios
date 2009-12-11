@@ -1,0 +1,6 @@
+maintainer        "37signals"
+maintainer_email  "sysadmins@37signals.com"
+description       "Configures nagios"
+version           "0.1"
+depends           "apache2"
+depends           "runit"

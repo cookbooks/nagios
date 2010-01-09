@@ -107,6 +107,22 @@ define command {
         command_line    $USER1$/check_http -I $HOSTADDRESS$ -H $ARG1$ -u $ARG2$ -s $ARG3$ -f follow -S
         }
 
+define command {
+      command_name    check_unauthorized_https_content
+      command_line    $USER1$/check_http -I $HOSTADDRESS$ -H $ARG1$ -u $ARG2$ -s $ARG3$ -f follow -e 401 -S
+      }
+
+
+define command {
+        command_name    check_https_image_content
+        command_line    $USER1$/check_http -I $HOSTADDRESS$ -H $ARG1$ -u $ARG2$ -f follow -S
+        }
+
+define command {
+        command_name    check_http_image_content_with_port
+        command_line    $USER1$/check_http -I $HOSTADDRESS$ -H $ARG1$ -u $ARG2$ -p $ARG3$ -f follow
+        }
+
 define command{
         command_name    check_campfire_poller
         command_line    $USER1$/check_http -I $HOSTADDRESS$ -p 2345 -u /stats -w 2 -c 3 -N

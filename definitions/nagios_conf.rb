@@ -1,5 +1,5 @@
 define :nagios_conf, :variables => {}, :config_subdir => true do
-  
+    
   subdir = if params[:config_subdir]
     "/#{node[:nagios][:config_subdir]}/"
   else

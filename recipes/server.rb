@@ -1,4 +1,5 @@
-include_recipe "apache2"
+require_recipe "nginx"
+require_recipe "fcgiwrap"
 
 package "nagios3"
 package "nagios-nrpe-plugin"
@@ -8,7 +9,7 @@ gem_package "xml-simple"
 gem_package "choice"
 
 gem_package "tinder"
-gem_package "clickatell"
+gem_package "twilio"
 gem_package "xmpp4r-simple"
 
 user "nagios" do
@@ -44,19 +45,8 @@ directory "/var/lib/nagios3/rw" do
   mode 02775
 end
 
-# Support our legacy nagios install
-directory "/usr/local/nagios"
-
-link "/usr/local/nagios/libexec" do
-  to "/usr/lib/nagios/plugins"
-end
-
 link "/bin/mail" do
   to "/usr/bin/mailx"
-end
-
-link "/usr/local/nagios/bin" do
-  to "/u/nagios/current/bin"
 end
 
 # using the node object inside this block fails, so we assign for now
@@ -68,12 +58,17 @@ userlist = node[:nagios][:users]
 # end
 
 nodes = []
-search(:node, "*", %w(ipaddress hostname)) {|n| nodes << n } unless Chef::Config[:solo]
+
+search(:node, "*:*") {|n| nodes << n } unless Chef::Config[:solo]
+
+sysadmin = {:sysadmin => search(:credentials, "id:sysadmin").first}
 
 runit_service "nagios3"
 
+
 nagios_conf "nagios" do
   config_subdir false
+  variables sysadmin
 end
 
 directory "#{node[:nagios][:root]}/dist" do
@@ -143,12 +138,19 @@ nagios_conf "contacts"
 nagios_conf "timeperiods"
 nagios_conf "services"
 
-template "/etc/nagios3/apache2.conf" do
-  source "apache2.conf.erb"
+template "/etc/nagios3/nginx.conf" do
+  source "nginx.conf.erb"
 end
 
-apache_site "nagios" do
-  config_path "/etc/nagios3/apache2.conf"
+# install the wildcard cert for this domain
+ssl_certificate "*.#{node[:public_domain] || node[:domain]}"
+
+link "/usr/share/nagios3/htdocs/stylesheets" do
+  to "/etc/nagios3/stylesheets"
+end
+
+nginx_site "nagios" do
+  config_path "/etc/nagios3/nginx.conf"
 end
 
 runit_service "nagios-bot"

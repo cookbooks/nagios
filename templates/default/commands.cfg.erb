@@ -271,54 +271,57 @@ define command{
 
 define command {
   command_name  host-notify-by-email
-  command_line  /usr/bin/printf "%b" "$LONGDATETIME$\n\n$HOSTALIAS$ $NOTIFICATIONTYPE$ $HOSTSTATE$\n\n$HOSTOUTPUT$\n\nLogin: ssh://$HOSTNAME$" | /bin/mail -s "$NOTIFICATIONTYPE$ - $HOSTALIAS$ $HOSTSTATE$!" $CONTACTEMAIL$
+  command_line  /usr/bin/printf "%b" "$LONGDATETIME$\n\n$HOSTALIAS$ $NOTIFICATIONTYPE$ $HOSTSTATE$\n\n$HOSTOUTPUT$\n\nLogin: ssh://$HOSTNAME$" | /bin/mail -s "$NOTIFICATIONTYPE$ - $HOSTALIAS$ $HOSTSTATE$! : $NOTIFICATIONCOMMENT$" $CONTACTEMAIL$
 }
 
 
 define command{
   command_name  host-notify-by-campfire
-  command_line  /usr/local/nagios/bin/campfire -r "<%= @node[:monitoring_campfire_room] %>" -S -l <%= @node[:campfire_email] %> -p <%= @node[:campfire_password] %> -m "$HOSTALIAS$ (ssh://$HOSTNAME$) $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTSTATE$ $HOSTOUTPUT$"
+  command_line  /usr/local/nagios/bin/campfire -r "<%= @node[:monitoring_campfire_room] %>" -S -l <%= @node[:campfire_token] %> -p X -m "$HOSTALIAS$ (ssh://$HOSTNAME$) $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTSTATE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
 
 }
 
 define command{
   command_name  host-notify-by-jabber
-  command_line  /usr/local/nagios/bin/jabber -j $CONTACTADDRESS1$ -m "$HOSTALIAS$ (ssh://$HOSTNAME$) $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTSTATE$ $HOSTOUTPUT$"
+  command_line  /usr/local/nagios/bin/jabber -j $CONTACTADDRESS1$ -m "$HOSTALIAS$ (ssh://$HOSTNAME$) $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTSTATE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
 
 }
 define command{
   command_name  host-notify-by-sms-email
-  command_line  /usr/bin/printf "%b" "$HOSTALIAS$ $NOTIFICATIONTYPE$ $HOSTSTATE$\n\n$HOSTOUTPUT$" | /bin/mail -s "$HOSTALIAS$ $HOSTSTATE$!" $CONTACTPAGER$
+  command_line  /usr/bin/printf "%b" "$HOSTALIAS$ $NOTIFICATIONTYPE$ $HOSTSTATE$\n\n$HOSTOUTPUT$" | /bin/mail -s "$HOSTALIAS$ $HOSTSTATE$! : $NOTIFICATIONCOMMENT$" $CONTACTPAGER$
 
 }
 
 define command{
   command_name  host-notify-by-sms-gateway
-  command_line  /usr/local/nagios/bin/clickatell -n $CONTACTPAGER$ -u <%= @node[:clickatell_username] %> -p <%= @node[:clickatell_password] %> -a <%= @node[:clickatell_api_id] %> -m "$HOSTALIAS$ $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTOUTPUT$" 
-
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/twilio -n $CONTACTPAGER$ -a <%= @node[:twilio_account_id] %> -t <%= @node[:twilio_token] %> -f <%= @node[:twilio_number] %> -m "$HOSTALIAS$ $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
 }
 
 # 'notify-by-email' command definition
 define command{
   command_name  service-notify-by-email
-  command_line  /usr/bin/printf "%b" "$LONGDATETIME$ - $SERVICEDESC$ $SERVICESTATE$\n\n$HOSTALIAS$  $NOTIFICATIONTYPE$\n\n$SERVICEOUTPUT$\n\nLogin: ssh://$HOSTNAME$" | /bin/mail -s "** $NOTIFICATIONTYPE$ - $HOSTALIAS$ - $SERVICEDESC$ - $SERVICESTATE$" $CONTACTEMAIL$
-  }
+  command_line  /usr/bin/printf "%b" "$LONGDATETIME$ - $SERVICEDESC$ $SERVICESTATE$\n\n$HOSTALIAS$  $NOTIFICATIONTYPE$\n\n$SERVICEOUTPUT$\n\nLogin: ssh://$HOSTNAME$ : $NOTIFICATIONCOMMENT$" | /bin/mail -s "** $NOTIFICATIONTYPE$ - $HOSTALIAS$ - $SERVICEDESC$ - $SERVICESTATE$" $CONTACTEMAIL$
+}
 
 
 define command {
   command_name  service-notify-by-campfire
-  command_line  /usr/local/nagios/bin/campfire -s 37s -r "<%= @node[:monitoring_campfire_room] %>" -S -l <%= @node[:campfire_email] %> -p <%= @node[:campfire_password] %> -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTALIAS$ (ssh://$HOSTNAME$) $NOTIFICATIONTYPE$ $SERVICEOUTPUT$"
+  command_line  /usr/local/nagios/bin/campfire -s 37s -r "<%= @node[:monitoring_campfire_room] %>" -S -l <%= @node[:campfire_token] %> -p X -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTALIAS$ (ssh://$HOSTNAME$) $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
 
 }
 
+define command{
+  command_name  service-notify-by-sms-email
+  command_line  /usr/bin/printf "%b" "$SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$" | /bin/mail -s "" $CONTACTPAGER$
+  }
+
 define command {
   command_name  service-notify-by-sms-gateway
-  command_line  /usr/local/nagios/bin/clickatell -n $CONTACTPAGER$ -u <%= @node[:clickatell_username] %> -p <%= @node[:clickatell_password] %> -a <%= @node[:clickatell_api_id] %> -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$" 
-
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/twilio -n $CONTACTPAGER$ -a <%= @node[:twilio_account_id] %> -t <%= @node[:twilio_token] %> -f <%= @node[:twilio_number] %> -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
 }
 
 define command {
   command_name  service-notify-by-jabber
-  command_line  /usr/local/nagios/bin/jabber -j $CONTACTADDRESS1$ -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTALIAS$ (ssh://$HOSTNAME$) $NOTIFICATIONTYPE$ $SERVICEOUTPUT$"
+  command_line  /usr/local/nagios/bin/jabber -j $CONTACTADDRESS1$ -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTALIAS$ (ssh://$HOSTNAME$) $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
 
 }

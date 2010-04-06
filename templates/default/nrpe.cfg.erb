@@ -15,5 +15,6 @@ command[check_bc_haproxy_queue]=/u/nagios/plugins/haproxy_stats.rb -w <%= @node[
 
 # Add checks for Solr index age.
 command[check_solr_index]=/usr/lib/nagios/plugins/check_file_age /u/solr/appname/data/index -w 2400 -c 3600
+command[check_hr_solr_index]=/usr/lib/nagios/plugins/check_file_age /u/solr/appname/data/index -w 3900 -c 5400
 
 

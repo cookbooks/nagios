@@ -6,6 +6,11 @@ define hostgroup {
   alias servers
 }
 
+define hostgroup {
+  hostgroup_name devices
+  alias devices
+}
+
 <% @roles.each do |name, conf| %>
 define hostgroup {
   hostgroup_name <%= name %>

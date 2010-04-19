@@ -1,60 +1,64 @@
+define contactgroup {
+  contactgroup_name sysadmin
+  alias             Sysadmins
+}
+
+define contactgroup {
+  contactgroup_name sysadmin-sms
+  alias             Sysadmins SMS
+}
+
 define contact {
-  contact_name                    root
-  alias                           Root
+  name                            default-contact
   service_notification_period     24x7
   host_notification_period        24x7
-  service_notification_options    w,u,c,r
-  host_notification_options       d,r
-  service_notification_commands   service-notify-by-email
-  host_notification_commands      host-notify-by-email
-  email                           root@localhost
+  service_notification_options    w,u,c,r,f,s
+  host_notification_options       d,u,r,f,s
+  service_notification_commands   service-notify-by-email, service-notify-by-jabber
+  host_notification_commands      host-notify-by-email, host-notify-by-sms-gateway, host-notify-by-jabber
+  register                        0
 }
 
-define contactgroup {
-  contactgroup_name       admins
-  alias                   Nagios Administrators
-  members                 root
+define contact {
+  name                            sms-contact
+  service_notification_period     24x7
+  host_notification_period        24x7
+  service_notification_options    w,u,c,r,f,s
+  host_notification_options       d,u,r,f,s
+  service_notification_commands   service-notify-by-sms-gateway
+  host_notification_commands      host-notify-by-sms-gateway
+  register                        0
 }
 
-define contactgroup {
-	contactgroup_name		sysadmin
-	alias					Sysadmins
+<% @sysadmins.each do |a| -%>
+<% next unless a[:monitoring] %>
+define contact {
+  use          default-contact
+  contact_name <%= a['id'] %>
+  alias        <%= a['full_name']%>
+  email        <%= a['monitoring']['email'] %>
+  pager        <%= a['monitoring']['sms'] %>
+  address1     <%= a['monitoring']['jabber'] %>
+  contactgroups sysadmin
 }
 
-define contactgroup {
-	contactgroup_name		sysadmin-sms
-	alias					Sysadmin SMS
+define contact {
+  use          sms-contact
+  contact_name <%= a['id'] %>
+  alias        <%= a['full_name']%>
+  email        <%= a['monitoring']['email'] %>
+  pager        <%= a['monitoring']['sms'] %>
+  address1     <%= a['monitoring']['jabber'] %>
+  contactgroups sysadmin-sms
 }
+<% end -%>
 
-
-define contact{
-  use			 generic-contact
-  contact_name admin
-  alias 		 Admin
-  email 		 admin@example.com
-  pager		 12345678
-  address1	admin@example.com
-  contactgroups	admins
-}
-
-define contact{
-  contact_name admin-sms
-  use			 sms-contact
-  alias 		 Admin
-  email 		 admin@example.com
-  pager		 12345678
-  address1	admin@example.com
-  contactgroups	sysadmin-sms
-  service_notification_commands service-notify-by-sms-gateway
-  host_notification_commands host-notify-by-sms-gateway
-}
-
-define contact{
+define contact {
   contact_name campfire
-  use			 generic-contact
-  alias 		 Campfire
+  use   default-contact
+  alias Campfire
   service_notification_commands   service-notify-by-campfire
   host_notification_commands      host-notify-by-campfire
-  email 		 monitoring@example.com
-  contactgroups	admins
+  email  <%= @campfire[:email] %>
+  contactgroups sysadmin
 }

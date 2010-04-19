@@ -1,6 +1,6 @@
 server {
   listen 443;
-  server_name nagios <% if @node[:public_domain] %> nagios.<%= @node[:public_domain] %><% end %>;
+  server_name nagios nagios.<%= @node[:domain] %>;
   
   root <%= @node[:nagios][:webroot] %>;
   
@@ -15,7 +15,7 @@ server {
   include /etc/nginx/helpers/headers.conf;
 
   location / {
-    root  /usr/lib/cgi-bin/nagios3;
+    root  /usr/share/nagios3/htdocs;
     index  index.html;
  
     rewrite  ^/nagios3/images/(.*) /images/$1 break;

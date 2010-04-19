@@ -1,8 +1,10 @@
 require_recipe "nginx"
 require_recipe "fcgiwrap"
+include_recipe "users"
 
 package "nagios3"
 package "nagios-nrpe-plugin"
+package 'spawn-fcgi'
 
 # required for Solr plugin
 gem_package "xml-simple"
@@ -29,11 +31,10 @@ directory "/etc/nagios3/.ssh" do
   group "nagios"
 end
 
-file "/etc/nagios3/htpasswd.users" do
+htpasswd_file "/etc/nagios3/htpasswd.users" do
   owner "nagios"
   group "www-data"
-  mode 0750
-  action :create
+  mode 0640
 end
 
 directory "/var/lib/nagios3" do
@@ -49,26 +50,15 @@ link "/bin/mail" do
   to "/usr/bin/mailx"
 end
 
-# using the node object inside this block fails, so we assign for now
-userlist = node[:nagios][:users]
-
-# TODO: use an htpasswd template and already-encryped passwords
-# add_htpasswd_users "/etc/nagios3/htpasswd.users" do
-#   users userlist
-# end
-
-nodes = []
-
-search(:node, "*:*") {|n| nodes << n } unless Chef::Config[:solo]
-
-sysadmin = {:sysadmin => search(:credentials, "id:sysadmin").first}
-
 runit_service "nagios3"
 
+sysadmin = search(:credentials, "id:sysadmin").first
+campfire = search(:credentials, "id:campfire").first
+sysadmin_users = search(:users, "group:admin")
 
 nagios_conf "nagios" do
   config_subdir false
-  variables sysadmin
+  variables({:sysadmin => sysadmin})
 end
 
 directory "#{node[:nagios][:root]}/dist" do
@@ -82,6 +72,7 @@ end
     owner "nagios"
     group "nagios"
     mode 0755
+    
   end
 end
 
@@ -105,8 +96,17 @@ nagios_conf "hostgroups" do
   variables({:roles => []})
 end
 
+nodes = []
+
+search(:node, "*:*") {|n| nodes << n }
+devices = search(:devices, "*:*")
+
 nagios_conf "hosts" do
-  variables({:hosts => nodes})
+  variables({:hosts => nodes, :devices => devices})
+end
+
+nagios_conf "contacts" do
+  variables({:sysadmins => sysadmin_users, :campfire => campfire})
 end
 
 nagios_template "local-service" do
@@ -118,25 +118,31 @@ end
 
 nagios_template "frequent-service" do
   template_type "service"
-	use "default-service"
-	max_check_attempts    3
+  use "default-service"
+  max_check_attempts    3
   normal_check_interval 5
   retry_check_interval  20
 end
 
 nagios_template "frequent-service-with-sms" do
   template_type "service"
-	use "frequent-service"
+  use "frequent-service"
   notification_interval 0
   notification_options "u,c,r"
-  contact_groups "admins, sysadmin-sms"
+  contact_groups "sysadmin, sysadmin-sms"
 end
 
 nagios_conf "templates"
 nagios_conf "commands"
-nagios_conf "contacts"
 nagios_conf "timeperiods"
-nagios_conf "services"
+
+nagios_conf "cgi" do
+  config_subdir false
+end
+
+nagios_conf "services" do
+  variables(:service_templates => node[:nagios][:templates][:service])
+end
 
 template "/etc/nagios3/nginx.conf" do
   source "nginx.conf.erb"
@@ -153,4 +159,8 @@ nginx_site "nagios" do
   config_path "/etc/nagios3/nginx.conf"
 end
 
-runit_service "nagios-bot"
+bot_data = search(:credentials, "id:jabber").first
+
+runit_service "nagios-bot" do
+  options :bot_data => bot_data
+end

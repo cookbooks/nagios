@@ -47,6 +47,11 @@ define command {
   command_line    $USER1$/check_nrpe -H $HOSTADDRESS$ -c check_mem -t 20
 } 
 
+define command {
+  command_name    check_snmp_env
+  command_line    $USER1$/check_snmp_env -H $HOSTADDRESS$ -C $ARG1$
+}
+
 
 define command {
 	command_name	check_query_count

@@ -37,10 +37,13 @@ define host {
 
 <% @hosts.each do |host| %>
 define host {
+  <% if host[:uptime] == nil || host['ipaddress'] == nil || host['hostname'] == nil %>
+  register  0
+  <% end %>
   use server
   address <%= host['ipaddress'] %>
   host_name <%= host['hostname'] %>
-  hostgroups servers
+  hostgroups servers<% host.run_list.roles.each do |role| %>, <%= role %><% end %>
 }
 
 <% end %>
@@ -51,7 +54,7 @@ define host {
   address <%= device['ipaddress'] %>
   host_name <%= device['fqdn'] %>
   alias <%= device['fqdn'].split(".").first %>
-  hostgroups devices
+  hostgroups devices, <%= device['type'] %>
 }
 
 <% end %>

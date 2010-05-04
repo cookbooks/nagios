@@ -92,14 +92,35 @@ remote_directory node[:nagios][:notifiers_dir] do
   mode 0755
 end
 
+role_list = begin
+              Chef::Role.list()
+            rescue => e
+              Chef::Log.error("#{e}\n#{e.backtrace.join("\n")}")
+              {}
+            end
+
+device_types = [ "apc_pdu", "fortigate_firewall", "cisco_switch", "isilon_storage", "rac", "osx_server"]
+
 nagios_conf "hostgroups" do
-  variables({:roles => []})
+  variables({:roles => role_list, :device_types => device_types})
 end
 
-nodes = []
+nodes = search(:node, "*:*")
 
-search(:node, "*:*") {|n| nodes << n }
+nagios_conf "hostgroups" do
+  variables({
+    :roles => role_list.delete_if {|role, _| !nodes.detect{|n| n.run_list.roles.include?(role) }},
+    :device_types => device_types
+    })
+end
+
+service_templates = search(:nagios, "id:service_templates").first
 devices = search(:devices, "*:*")
+cisco_switches = search(:devices, "type:cisco_switch")
+fortigate_firewalls = search(:devices, "type:fortigate_firewall")
+apc_pdus = search(:devices, "type:apc_pdu")
+isilon_storage_clusters = search(:devices, "type:isilon_storage")
+snmp = search(:credentials, "id:snmp").first
 
 nagios_conf "hosts" do
   variables({:hosts => nodes, :devices => devices})
@@ -141,7 +162,16 @@ nagios_conf "cgi" do
 end
 
 nagios_conf "services" do
-  variables(:service_templates => node[:nagios][:templates][:service])
+  variables(
+    :service_templates => service_templates,
+    :cisco_switches => cisco_switches, 
+    :fortigate_firewalls => fortigate_firewalls,
+    :apc_pdus => apc_pdus,
+    :isilon_storage_clusters => isilon_storage_clusters,
+    :community => snmp['community'],
+    :devices => devices,
+    :nodes => nodes
+    )
 end
 
 template "/etc/nagios3/nginx.conf" do

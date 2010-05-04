@@ -12,6 +12,7 @@ define hostgroup {
 }
 
 <% @roles.each do |name, conf| %>
+
 define hostgroup {
   hostgroup_name <%= name %>
   alias <%= conf[:alias] || name %>
@@ -19,3 +20,10 @@ define hostgroup {
 
 <% end %>
 
+<% @device_types.each do |device_type| %>
+define hostgroup {
+  hostgroup_name <%= device_type %>
+  alias <%= device_type %>
+}
+
+<% end %>

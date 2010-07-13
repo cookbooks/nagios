@@ -79,6 +79,11 @@ define command {
 }
 
 define command {
+  command_name    check_local_file_age
+  command_line    $USER1$/check_file_age $ARG1$ -w $ARG2$ -c $ARG3$
+}
+
+define command {
   command_name    check_file_count
   command_line    $USER1$/check_by_ssh -H $HOSTADDRESS$ -C "<%= @node[:nagios][:plugins_dir] %>/file_queues.rb -t count -p $ARG1$ -w $ARG2$ -c $ARG3$" -l app
 }
@@ -89,22 +94,34 @@ define command {
 }
 
 define command { 
+  command_name    check_highrise_item_age
+  command_line    <%= @node[:nagios][:plugins_dir] %>/check_highrise.rb -s $ARG1$ -a $ARG2$ -i $ARG3$ -c $ARG4$ -w $ARG5$
+}
+
+define command { 
+  command_name    check_mogilefs_bored_workers
+  command_line    <%= @node[:nagios][:plugins_dir] %>/check_mogilefs_bored_workers.rb -h $HOSTADDRESS$ -p $ARG1$ -c $ARG2$ -w $ARG3$
+}
+
+define command { 
+  command_name    check_redis
+  command_line    <%= @node[:nagios][:plugins_dir] %>/check_redis.rb $HOSTADDRESS$ $ARG1$
+}
+
+define command { 
   command_name    check_solr
-  command_line    $USER3$/check_solr.rb -c 10 -h $HOSTADDRESS$ -r 10 -p $ARG1$
-  
+  command_line    <%= @node[:nagios][:plugins_dir] %>/check_solr.rb -c 10 -h $HOSTADDRESS$ -r 10 -p $ARG1$
 }
 
 define command { 
   command_name    query_solr
-  command_line    $USER3$/check_solr.rb -c 10 -h $HOSTADDRESS$ -r 10 -p $ARG1$ -q $ARG2$
-  
+  command_line    <%= @node[:nagios][:plugins_dir] %>/check_solr.rb -c 10 -h $HOSTADDRESS$ -r 10 -p $ARG1$ -q $ARG2$
 }
 
 define command { 
   command_name    check_mem
   command_line    $USER1$/check_nrpe -H $HOSTADDRESS$ -c check_mem -t 20
 } 
-
 
 define command {
 	command_name	check_query_count
@@ -175,6 +192,20 @@ define command {
       command_line    $USER1$/check_http -I $HOSTADDRESS$ -H $ARG1$ -u $ARG2$ -s $ARG3$ -f follow -e 401 -S
       }
 
+define command {
+      command_name    check-host-alive-by-http
+      command_line    $USER1$/check_tcp -H $HOSTADDRESS$ -p 80
+}
+
+define command {
+      command_name    check-ip-alive-by-http
+      command_line    $USER1$/check_tcp -H $ARG1$ -p 80
+}
+
+define command {
+      command_name    check-host-alive-by-https
+      command_line    $USER1$/check_tcp -H $HOSTADDRESS$ -p 443
+}
 
 define command {
         command_name    check_https_image_content
@@ -219,6 +250,11 @@ define command{
         }
 
 define command{
+        command_name    check_smtp_relay
+        command_line    $USER1$/check_smtp -H $HOSTADDRESS$ -e ESMTP -C "MAIL FROM: nagios@37signals.com" -R "250" -C "RCPT TO: system@highrisehq.com" -R "250"
+        }
+
+define command{
 	command_name	check_tcp
 	command_line	$USER1$/check_tcp -H $HOSTADDRESS$ -p $ARG1$
 	}
@@ -257,7 +293,12 @@ define command {
 
 define command {
 	command_name	check_mysqlrep
-	command_line	$USER3$/check-mysql-slave.pl --host $HOSTADDRESS$ --port $ARG1$ --user replcheck --password $ARG2$ --warn $ARG3$ --crit $ARG4$
+	command_line	<%= @node[:nagios][:plugins_dir] %>/check-mysql-slave.pl --host $HOSTADDRESS$ --port $ARG1$ --user replcheck --password $ARG2$ --warn $ARG3$ --crit $ARG4$
+}
+
+define command {
+	command_name	check_blacklist
+	command_line	<%= @node[:nagios][:plugins_dir] %>/check_bl_async.pl -H $HOSTADDRESS$ -B $ARG1$ -c $ARG2$
 }
 
 # nrpe remote host checks
@@ -334,57 +375,78 @@ define command{
 
 define command {
   command_name  host-notify-by-email
-  command_line  /usr/bin/printf "%b" "$LONGDATETIME$\n\n$HOSTALIAS$ $NOTIFICATIONTYPE$ $HOSTSTATE$\n\n$HOSTOUTPUT$\n\nLogin: ssh://$HOSTNAME$" | /bin/mail -s "$NOTIFICATIONTYPE$ - $HOSTALIAS$ $HOSTSTATE$! : $NOTIFICATIONCOMMENT$" $CONTACTEMAIL$
+  command_line  /usr/bin/printf "%b" "$LONGDATETIME$\n\n$HOSTALIAS$ $NOTIFICATIONTYPE$ $HOSTSTATE$\n\n$HOSTOUTPUT$\n\nLogin: ssh://$HOSTNAME$" | /bin/mail -s "[SC-CHI] $NOTIFICATIONTYPE$ - $HOSTALIAS$ $HOSTSTATE$! : $NOTIFICATIONCOMMENT$" $CONTACTEMAIL$
 }
 
 
 define command{
   command_name  host-notify-by-campfire
-  command_line  /usr/local/nagios/bin/campfire -r "<%= @node[:monitoring_campfire_room] %>" -S -l <%= @node[:campfire_token] %> -p X -m "$HOSTALIAS$ (ssh://$HOSTNAME$) $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTSTATE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/campfire -s 37s -r "<%= @node[:monitoring_campfire_room] %>" -S -l <%= @node[:campfire_token] %> -p X -m "[SC-CHI] $HOSTALIAS$ (ssh://$HOSTNAME$) $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTSTATE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
 
 }
 
 define command{
   command_name  host-notify-by-jabber
-  command_line  /usr/local/nagios/bin/jabber -j $CONTACTADDRESS1$ -m "$HOSTALIAS$ (ssh://$HOSTNAME$) $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTSTATE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
-
-}
-define command{
-  command_name  host-notify-by-sms-email
-  command_line  /usr/bin/printf "%b" "$HOSTALIAS$ $NOTIFICATIONTYPE$ $HOSTSTATE$\n\n$HOSTOUTPUT$" | /bin/mail -s "$HOSTALIAS$ $HOSTSTATE$! : $NOTIFICATIONCOMMENT$" $CONTACTPAGER$
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/jabber -j $CONTACTADDRESS1$ -m "[SC-CHI] $HOSTALIAS$ (ssh://$HOSTNAME$) $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTSTATE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
 
 }
 
 define command{
   command_name  host-notify-by-sms-gateway
-  command_line  <%= @node[:nagios][:notifiers_dir] %>/twilio -n $CONTACTPAGER$ -a <%= @node[:twilio_account_id] %> -t <%= @node[:twilio_token] %> -f <%= @node[:twilio_number] %> -m "$HOSTALIAS$ $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/twilio -n $CONTACTPAGER$ -a <%= @node[:twilio_account_id] %> -t <%= @node[:twilio_token] %> -f <%= @node[:twilio_number] %> -m "[SC-CHI] $HOSTALIAS$ $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
+}
+
+define command{
+  command_name  host-notify-by-clickatell-sms-gateway
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/clickatell -n $CONTACTPAGER$ -u <%= @node[:clickatell_username] %> -p <%= @node[:clickatell_password] %> -a <%= @node[:clickatell_api_id] %> -m "[SC-CHI] $HOSTALIAS$ $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
+}
+
+define command{
+  command_name  host-notify-by-bulksms-gateway
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/bulksms -n $CONTACTPAGER$ -u <%=  @notifiers[:bulksms][:username] %> -p <%=  @notifiers[:bulksms][:password] %> -c <%=  @notifiers[:bulksms][:country] %> -m "[SC-CHI] $HOSTALIAS$ $HOSTSTATE$ $NOTIFICATIONTYPE$ $HOSTOUTPUT$ : $NOTIFICATIONCOMMENT$"
+}
+
+define command{
+  command_name  host-notify-by-sms-email
+  command_line  /usr/bin/printf "%b" "[SC-CHI] $HOSTALIAS$ $NOTIFICATIONTYPE$ $HOSTSTATE$\n\n$HOSTOUTPUT$" | /bin/mail -s "$HOSTALIAS$ $HOSTSTATE$! : $NOTIFICATIONCOMMENT$" $CONTACTPAGER$
+
 }
 
 # 'notify-by-email' command definition
 define command{
   command_name  service-notify-by-email
-  command_line  /usr/bin/printf "%b" "$LONGDATETIME$ - $SERVICEDESC$ $SERVICESTATE$\n\n$HOSTALIAS$  $NOTIFICATIONTYPE$\n\n$SERVICEOUTPUT$\n\nLogin: ssh://$HOSTNAME$ : $NOTIFICATIONCOMMENT$" | /bin/mail -s "** $NOTIFICATIONTYPE$ - $HOSTALIAS$ - $SERVICEDESC$ - $SERVICESTATE$" $CONTACTEMAIL$
+  command_line  /usr/bin/printf "%b" "[SC-CHI] $LONGDATETIME$ - $SERVICEDESC$ $SERVICESTATE$\n\n$HOSTALIAS$  $NOTIFICATIONTYPE$\n\n$SERVICEOUTPUT$\n\nLogin: ssh://$HOSTNAME$ : $NOTIFICATIONCOMMENT$" | /bin/mail -s "** $NOTIFICATIONTYPE$ - $HOSTALIAS$ - $SERVICEDESC$ - $SERVICESTATE$" $CONTACTEMAIL$
 }
 
 
 define command {
   command_name  service-notify-by-campfire
-  command_line  /usr/local/nagios/bin/campfire -s 37s -r "<%= @node[:monitoring_campfire_room] %>" -S -l <%= @node[:campfire_token] %> -p X -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTALIAS$ (ssh://$HOSTNAME$) $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/campfire -s 37s -r "<%= @node[:monitoring_campfire_room] %>" -S -l <%= @node[:campfire_token] %> -p X -m "[SC-CHI] $SERVICEDESC$ $SERVICESTATE$ $HOSTALIAS$ (ssh://$HOSTNAME$) $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
 
 }
 
 define command{
   command_name  service-notify-by-sms-email
-  command_line  /usr/bin/printf "%b" "$SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$" | /bin/mail -s "" $CONTACTPAGER$
+  command_line  /usr/bin/printf "%b" "[SC-CHI] $SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$" | /bin/mail -s "" $CONTACTPAGER$
   }
 
 define command {
   command_name  service-notify-by-sms-gateway
-  command_line  <%= @node[:nagios][:notifiers_dir] %>/twilio -n $CONTACTPAGER$ -a <%= @node[:twilio_account_id] %> -t <%= @node[:twilio_token] %> -f <%= @node[:twilio_number] %> -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/twilio -n $CONTACTPAGER$ -a <%= @node[:twilio_account_id] %> -t <%= @node[:twilio_token] %> -f <%= @node[:twilio_number] %> -m "[SC-CHI] $SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
+}
+
+define command {
+  command_name  service-notify-by-clickatell-sms-gateway
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/clickatell -n $CONTACTPAGER$ -u <%= @node[:clickatell_username] %> -p <%= @node[:clickatell_password] %> -a <%= @node[:clickatell_api_id] %> -m "[SC-CHI] $SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
+}
+
+define command {
+  command_name  service-notify-by-bulksms-gateway
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/bulksms -n $CONTACTPAGER$ -u <%= @notifiers[:bulksms][:username] %> -p <%= @notifiers[:bulksms][:password] %> -c <%= @notifiers[:bulksms][:country] %> -m "[SC-CHI] $SERVICEDESC$ $SERVICESTATE$ $HOSTNAME$ $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
 }
 
 define command {
   command_name  service-notify-by-jabber
-  command_line  /usr/local/nagios/bin/jabber -j $CONTACTADDRESS1$ -m "$SERVICEDESC$ $SERVICESTATE$ $HOSTALIAS$ (ssh://$HOSTNAME$) $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
+  command_line  <%= @node[:nagios][:notifiers_dir] %>/jabber -j $CONTACTADDRESS1$ -m "[SC-CHI] $SERVICEDESC$ $SERVICESTATE$ $HOSTALIAS$ (ssh://$HOSTNAME$) $NOTIFICATIONTYPE$ $SERVICEOUTPUT$ : $NOTIFICATIONCOMMENT$"
 
 }

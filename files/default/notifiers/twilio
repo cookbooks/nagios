@@ -47,7 +47,7 @@ Choice.options do
     option :message do
       short '-m'
       long '--message=MESSAGE'
-      desc 'Message to be sent'      
+      desc 'Message to be sent'
     end
     
     separator ''
@@ -61,14 +61,21 @@ Choice.options do
 
 choices = Choice.choices
 if choices
-  args = {
-    'To' => choices[:number],
-    'From' => choices[:from],
-    'Body' => choices[:message]
-  }  
   
-  account = Twilio::RestAccount.new(choices[:account_id], choices[:token])
-  STDERR.puts account.request("/#{API_VERSION}/Accounts/#{choices[:account_id]}/SMS/Messages", "POST", args).inspect
+  if choices[:message].length > 160
+    messages = choices[:message].scan(/.{1,160}/)
+  else
+    messages = [choices[:message]]
+  end
+  
+  messages.each do |message|
+    args = {
+      'To' => choices[:number],
+      'From' => choices[:from],
+      'Body' => message
+    }  
+  
+    account = Twilio::RestAccount.new(choices[:account_id], choices[:token])
+    STDERR.puts account.request("/#{API_VERSION}/Accounts/#{choices[:account_id]}/SMS/Messages", "POST", args).inspect
+  end
 end
-
-

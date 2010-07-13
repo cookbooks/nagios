@@ -1,41 +1,6 @@
 define service {
-  name                            default-service
-  active_checks_enabled           1
-  passive_checks_enabled          1
-  parallelize_check               1
-  obsess_over_service             1
-  check_freshness                 0
-  notifications_enabled           1
-  event_handler_enabled           1
-  flap_detection_enabled          1
-  failure_prediction_enabled      1
-  process_perf_data               1
-  retain_status_information       1
-  retain_nonstatus_information    1
-  is_volatile                     0
-  check_period                    24x7
-  max_check_attempts              <%= nagios_attr(:default_service)[:max_check_attempts] %>
-  check_interval                  <%= nagios_interval(nagios_attr(:default_service)[:check_interval]) %>
-  retry_interval                  <%= nagios_interval(nagios_attr(:default_service)[:retry_interval]) %>
-  contact_groups                  <%= nagios_attr(:default_contact_groups).join(",") %>
-  notification_options            w,u,c,r
-  notification_interval           <%= nagios_interval(nagios_attr(:default_service)[:notification_interval]) %>
-  notification_period             24x7
-  register                        0
-}
-
-<% @service_templates.reject { |k,v| k == 'id' }.each do |name, params| %>
-define service {
-  register  0
-  <% params.reject { |k,v| k == 'template_type' }.each do |n, v| %>
-  <%= n %>  <%= v %>
-  <% end %>
-}
-<% end %>
-
-define service {
   use default-service
-  host_name *
+  host_name *<% @no_ping_devices.each do |no_ping_device| %>,!<%= no_ping_device['fqdn'] %><% end %>
   service_description ping
   check_command check_ping!100.0,20%!500.0,60%
 }
@@ -43,6 +8,7 @@ define service {
 define service {
   use                     default-service
   hostgroup_name          servers
+  host_name               <%= @free_disk_disable_servers.map { |v| "!#{v[:fqdn]}" }.compact.join(', ') %>
   service_description     Free Space All Disks
   check_command           check_all_disks
 }
@@ -50,6 +16,7 @@ define service {
 define service {
   use                     default-service
   hostgroup_name          servers
+  host_name               <%= @load_disable_servers.map { |v| "!#{v[:fqdn]}" }.compact.join(', ') %>
   service_description     Load Average
   check_command           check_load
 }
@@ -57,6 +24,7 @@ define service {
 define service{
   use                     default-service
   hostgroup_name          servers
+  host_name               <%= @free_memory_disable_servers.map { |v| "!#{v[:fqdn]}" }.compact.join(', ') %>
   service_description     Free Memory
   check_command           check_mem
 }
@@ -68,22 +36,6 @@ define service{
   check_command           check_nrpe!check_openmanage
 }
 
-define service {
-  register  0
-  name                    check-jabber
-  use                     default-service
-  service_description     jabber status
-  check_command           check_tcp!5223
-}
-
-define service {
-  register  0
-  name                    check-vnc
-  use                     default-service
-  service_description     vnc status
-  check_command           check_tcp!5900
-}
-
 # Fortigate Checks
 
 <% @fortigate_firewalls.each do |firewall| %>
@@ -91,14 +43,14 @@ define service {
     use                     default-service
     host_name               <%= firewall['fqdn'] %>
     service_description     Fortigate Firewall CPU
-    check_command           check_fortigate_cpu!<%= @community %>!60!80
+    check_command           check_fortigate_cpu!<%= @community %>!70!85
   }
 
   define service{
     use                     default-service
     host_name               <%= firewall['fqdn'] %>
     service_description     Fortigate Firewall Memory
-    check_command           check_fortigate_memory!<%= @community %>!60!80
+    check_command           check_fortigate_memory!<%= @community %>!70!85
   }
     <% firewall['active_ports'].each do |port| %>
     
@@ -223,36 +175,50 @@ define service {
   }
 <% end %>
 
-<% @devices.each do |device| %>
-  <% if device['checks'] %>
-    <% device['checks'].each do |key, check| %>
-    define service{
-        <% if check['enabled'] == false %>
-        register  0
-        <% end %>
-        use                 <%= key %>
-        host_name           <%= device['fqdn'] %>
+<% @nodes.each do |node| %>
+  <% if node[:nagios] && node[:nagios][:services] %>
+    <% node[:nagios][:services].each do |name, params| %>
+    define service {
+      host_name <%= node['hostname'] %>
+      <% params.each do |n, v| %>
+      <%= n %>  <%= v %>
+      <% end %>
     }
     <% end %>
   <% end %>
 <% end %>
 
-<% @nodes.each do |node| %>
-  <% if node['nagios']['checks'] %>
-    <% node['nagios']['checks'].each do |name, check| %>
-    define service{
-        <% if check['enabled'] == false %>
-        register  0
-        <% end %>
-        use                 <%= check[:template] %>
-        host_name           <%= node['fqdn'] %>
-        <% if check[:description] %>
-        service_description <%= check[:description] %>
-        <% end %>
-        <% if check[:command] %>
-        check_command <%= check[:command] %>
-        <% end %>
+<% @devices.each do |device| %>
+  <% if device[:services] %>
+    <% device[:services].reject { |k,v| k == 'id' }.each do |name, params| %>
+    define service {
+      host_name <%= device['fqdn'] %>
+      <% params.each do |n, v| %>
+      <%= n %>  <%= v %>
+      <% end %>
     }
     <% end %>
   <% end %>
 <% end %>
+
+<% @other_hosts.each do |host| %>
+  <% if host[:services] %>
+    <% host[:services].reject { |k,v| k == 'id' }.each do |name, params| %>
+    define service {
+      host_name <%= host['fqdn'] %>
+      <% params.each do |n, v| %>
+      <%= n %>  <%= v %>
+      <% end %>
+    }
+    <% end %>
+  <% end %>
+<% end %>
+
+#<% @proxy_instances.each do |host, vip_prefix, proxy_vip_octet, app_name| %>
+#    define service {
+#      use                     default-service
+#      host_name               <%= host %>
+#      service_description     <%= app_name %> HAProxy Port Status
+#      check_command           check-ip-alive-by-http!<%= vip_prefix %>.<%= proxy_vip_octet %>
+#    }
+#<% end %>

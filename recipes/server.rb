@@ -1,10 +1,13 @@
 require_recipe "nginx"
 require_recipe "fcgiwrap"
+require_recipe  "runit"
 include_recipe "users"
 
 package "nagios3"
 package "nagios-nrpe-plugin"
 package 'spawn-fcgi'
+package 'libclass-dbi-perl'
+package 'libnet-dns-perl'
 
 # required for Solr plugin
 gem_package "xml-simple"
@@ -13,6 +16,8 @@ gem_package "choice"
 gem_package "tinder"
 gem_package "twilio"
 gem_package "xmpp4r-simple"
+gem_package "twiliolib"
+gem_package "clickatell"
 
 user "nagios" do
   action :manage
@@ -52,9 +57,10 @@ end
 
 runit_service "nagios3"
 
+notifiers = search(:credentials, "id:notifiers").first
 sysadmin = search(:credentials, "id:sysadmin").first
 campfire = search(:credentials, "id:campfire").first
-sysadmin_users = search(:users, "group:admin")
+sysadmin_users = search(:users, "groups:admin")
 
 nagios_conf "nagios" do
   config_subdir false
@@ -100,6 +106,19 @@ role_list = begin
             end
 
 device_types = [ "apc_pdu", "fortigate_firewall", "cisco_switch", "isilon_storage", "rac", "osx_server"]
+devices = search(:devices, "*:*")
+cisco_switches = search(:devices, "type:cisco_switch")
+fortigate_firewalls = search(:devices, "type:fortigate_firewall")
+apc_pdus = search(:devices, "type:apc_pdu")
+isilon_storage_clusters = search(:devices, "type:isilon_storage")
+snmp = search(:credentials, "id:snmp").first
+other_hosts = search(:nagios_hosts, "*:*")
+no_ping_devices = search(:devices, "disable_ping:true")
+proxy_servers = search(:node, "role:proxy")
+free_disk_disable_servers = search(:node, "nagios_free_disk_enable:false")
+free_memory_disable_servers = search(:node, "nagios_free_memory_enable:false")
+load_disable_servers = search(:node, "nagios_load_enable:false")
+pager_duty_credentials = search(:credentials, "id:pager_duty").first
 
 nagios_conf "hostgroups" do
   variables({:roles => role_list, :device_types => device_types})
@@ -114,63 +133,55 @@ nagios_conf "hostgroups" do
     })
 end
 
-service_templates = search(:nagios, "id:service_templates").first
-devices = search(:devices, "*:*")
-cisco_switches = search(:devices, "type:cisco_switch")
-fortigate_firewalls = search(:devices, "type:fortigate_firewall")
-apc_pdus = search(:devices, "type:apc_pdu")
-isilon_storage_clusters = search(:devices, "type:isilon_storage")
-snmp = search(:credentials, "id:snmp").first
-
 nagios_conf "hosts" do
-  variables({:hosts => nodes, :devices => devices})
+  variables({:hosts => nodes, :devices => devices, :other_hosts => other_hosts})
 end
 
 nagios_conf "contacts" do
   variables({:sysadmins => sysadmin_users, :campfire => campfire})
 end
 
-nagios_template "local-service" do
-  template_type "service"
-  max_check_attempts      4
-  normal_check_interval   300
-  retry_check_interval    60
-end
-
-nagios_template "frequent-service" do
-  template_type "service"
-  use "default-service"
-  max_check_attempts    3
-  normal_check_interval 5
-  retry_check_interval  20
-end
-
-nagios_template "frequent-service-with-sms" do
-  template_type "service"
-  use "frequent-service"
-  notification_interval 0
-  notification_options "u,c,r"
-  contact_groups "sysadmin, sysadmin-sms"
-end
-
+nagios_conf "service_templates"
 nagios_conf "templates"
-nagios_conf "commands"
+
+nagios_conf "commands" do
+  variables({:notifiers => notifiers})
+  
+end
+
 nagios_conf "timeperiods"
 
 nagios_conf "cgi" do
   config_subdir false
 end
 
+nagios_conf "pagerduty_nagios" do
+  variables(:credentials => pager_duty_credentials)
+end
+
+proxy_instances = []
+proxy_servers.each do |proxy_server|
+  proxy_server[:active_applications].each do |app_name, active_application|
+    app = search(:apps, "id:#{app_name}").first
+    proxy_instances << [proxy_server[:hostname], proxy_server[:proxy][:vip_prefix], app[:proxy_vip_octet], app_name] if proxy_server[:proxy] && proxy_server[:proxy][:vip_prefix] && app[:proxy_vip_octet]
+  end
+end
+
 nagios_conf "services" do
   variables(
-    :service_templates => service_templates,
     :cisco_switches => cisco_switches, 
     :fortigate_firewalls => fortigate_firewalls,
     :apc_pdus => apc_pdus,
     :isilon_storage_clusters => isilon_storage_clusters,
     :community => snmp['community'],
     :devices => devices,
-    :nodes => nodes
+    :nodes => nodes,
+    :other_hosts => other_hosts,
+    :no_ping_devices => no_ping_devices,
+    :proxy_instances => proxy_instances,
+    :free_disk_disable_servers => free_disk_disable_servers,
+    :free_memory_disable_servers => free_memory_disable_servers,
+    :load_disable_servers => free_memory_disable_servers
     )
 end
 
@@ -179,7 +190,7 @@ template "/etc/nagios3/nginx.conf" do
 end
 
 # install the wildcard cert for this domain
-ssl_certificate "*.#{node[:public_domain] || node[:domain]}"
+ssl_certificate "*.#{node[:domain]}"
 
 link "/usr/share/nagios3/htdocs/stylesheets" do
   to "/etc/nagios3/stylesheets"

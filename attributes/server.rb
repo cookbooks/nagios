@@ -21,7 +21,7 @@ default.nagios[:default_host][:max_check_attempts] = 1
 
 default.nagios[:default_service][:check_interval] = 60
 default.nagios[:default_service][:retry_interval] = 15
-default.nagios[:default_service][:notification_interval] = 1200
+default.nagios[:default_service][:notification_interval] = 600
 default.nagios[:default_service][:max_check_attempts] = 3
 
 default.nagios[:notifiers_dir] = "/var/lib/nagios3/notifiers"

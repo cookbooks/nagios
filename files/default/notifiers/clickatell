@@ -54,5 +54,13 @@ Choice.options do
 choices = Choice.choices
 if choices
   api = Clickatell::API.authenticate(choices[:api_id], choices[:username], choices[:password])
-  api.send_message(choices[:number], choices[:message])
+  # split message up if it's longer than 153 characters
+  if choices[:message].length > 153
+    message_count = (choices[:message].length.to_f / 153).ceil
+    opts = {:concat => message_count}
+  else
+    opts = {}
+  end
+  puts "OPTIONS #{opts.inspect}"
+  api.send_message(choices[:number], choices[:message], opts)
 end

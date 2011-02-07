@@ -25,7 +25,7 @@ mon_host = Array.new
 if node.run_list.roles.include?(node[:nagios][:server_role])
   mon_host << node[:ipaddress]
 else
-  search(:node, "role:#{node[:nagios][:server_role]}") do |n|
+  search(:node, "role:#{node[:nagios][:server_role]} AND app_environment:#{node[:app_environment]}") do |n|
     mon_host << n['ipaddress']
   end
 end
@@ -44,11 +44,12 @@ service "nagios-nrpe-server" do
   supports :restart => true, :reload => true
 end
 
-cookbook_file "/usr/lib/nagios/plugins/check_mem.sh" do
-  source "plugins/check_mem.sh"
+remote_directory "/usr/lib/nagios/plugins" do
+  source "plugins"
   owner "nagios"
   group "nagios"
   mode 0755
+  files_mode 0755
 end
 
 template "/etc/nagios/nrpe.cfg" do
